@@ -10,7 +10,8 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using ChatroomFetcher.YoutubeData;
-using Microsoft.Web.WebView2.Wpf;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
 
 namespace ChatroomFetcher
 {
@@ -42,7 +43,7 @@ namespace ChatroomFetcher
                 "origin",
                 "https://www.youtube.com");
             
-            var chatroomHtmlContent = await httpClient.GetStringAsync("https://www.youtube.com/live_chat?is_popout=1&v=Lec6vHJVue4");
+            var chatroomHtmlContent = await httpClient.GetStringAsync($"https://www.youtube.com/live_chat?is_popout=1&v=UvAbNt97dUA");
 
             var key = (new Regex("\"INNERTUBE_API_KEY\":\"(.+)\",\"INNERTUBE_API_VERSION\""))
                 .Matches(chatroomHtmlContent)[0]
