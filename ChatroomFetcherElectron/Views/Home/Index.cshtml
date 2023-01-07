@@ -1,0 +1,51 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<section id="settingSection">
+    <section id="ecpaySettingSection">
+        <div>
+            <label for="ecpayId">
+                綠界 ID:
+            </label>
+            <input type="text" id="ecpayId"/>
+        </div>
+        <div>
+            <label for="ecpayFakeSource">
+                偽造來源為 youtube ？（若不的話，模板需支援 service 為 ecpay 的資料）:
+            </label>
+            <input type="checkbox" id="ecpayFakeSource"/>
+        </div>
+    </section>
+    <section id="opaySettingSection">
+            <div>
+                <label for="opayId">
+                    歐付寶 ID:
+                </label>
+                <input type="text" id="opayId"/>
+            </div>
+            <div>
+                <label for="opayFakeSource">
+                    偽造來源為 youtube ？（若不的話，模板需支援 service 為 opay 的資料）:
+                </label>
+                <input type="checkbox" id="opayFakeSource"/>
+            </div>
+        </section>
+    <section id="onecommeSettingSection">
+        <div>
+            <label for="onecommeUrl">
+                わんコメ網址:
+            </label>
+            <input type="text" id="onecommeUrl"/>
+        </div>
+        <div>
+            <label for="onecommeTemplateDirectory">
+                わんコメ模板位置:
+            </label>
+            <input type="text" id="onecommeTemplateDirectory"/>
+        </div>
+    </section>
+    <button id="connectButton">連線</button>
+</section>
+
+<script src="js/fetcher.js"></script>
