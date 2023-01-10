@@ -3,6 +3,14 @@
 }
 
 <section id="settingSection">
+    <section id="youtubeSettingSection">
+        <div>
+            <label for="youtubeLiveId">
+                Youtube Live ID (尚未完成，無法擷取超級留言與超級貼圖):
+            </label>
+            <input type="text" id="youtubeLiveId"/>
+        </div>
+    </section>
     <section id="ecpaySettingSection">
         <div>
             <label for="ecpayId">
@@ -18,19 +26,19 @@
         </div>
     </section>
     <section id="opaySettingSection">
-            <div>
-                <label for="opayId">
-                    歐付寶 ID:
-                </label>
-                <input type="text" id="opayId"/>
-            </div>
-            <div>
-                <label for="opayFakeSource">
-                    偽造來源為 youtube ？（若不的話，模板需支援 service 為 opay 的資料）:
-                </label>
-                <input type="checkbox" id="opayFakeSource"/>
-            </div>
-        </section>
+        <div>
+            <label for="opayId">
+                歐付寶 ID:
+            </label>
+            <input type="text" id="opayId"/>
+        </div>
+        <div>
+            <label for="opayFakeSource">
+                偽造來源為 youtube ？（若不的話，模板需支援 service 為 opay 的資料）:
+            </label>
+            <input type="checkbox" id="opayFakeSource"/>
+        </div>
+    </section>
     <section id="onecommeSettingSection">
         <div>
             <label for="onecommeUrl">
@@ -48,4 +56,10 @@
     <button id="connectButton">連線</button>
 </section>
 
+<section id="messageSection">
+    <ul id="messageList">
+    </ul>
+</section>
+
+<link href="css/site.css" rel="stylesheet" type="text/css"/>
 <script src="js/fetcher.js"></script>

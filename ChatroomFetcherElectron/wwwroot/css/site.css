@@ -16,3 +16,46 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+#messageSection {
+  margin-top: 15px; 
+}
+
+#messageSection ul#messageList {
+  list-style-type: none;
+  display: grid;
+  grid: auto-flow / 1fr;
+}
+
+#messageSection ul#messageList li {
+  padding: 5px;
+  margin-top: 10px;
+}
+
+#messageSection ul#messageList li .nameSection {
+  border-bottom: 1px solid black;
+  padding-bottom: 5px;
+}
+
+#messageSection ul#messageList li .contentSection {
+  margin-top: 5px;  
+}
+
+#messageSection ul#messageList li .contentSection img {
+  width: 32px;
+  height: auto;
+}
+
+#messageSection ul#messageList li .informationSection {
+  font-size: x-small;
+}
+
+.avatar {
+  width: 32px;
+  height: auto;
+}
+
+.donateText {
+  background: black;
+  color: white;
+}

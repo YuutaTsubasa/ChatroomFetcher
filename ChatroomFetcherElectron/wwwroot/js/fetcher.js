@@ -1,5 +1,6 @@
 ﻿const { ipcRenderer } = require('electron');
 const SETTING_KEYS = {
+    YOUTUBE_LIVE_ID: "youtubeLiveId",
     ECPAY_ID: "ecpayId",
     ECPAY_FAKE_SOURCE: "ecpayFakeSource",
     OPAY_ID: "opayId",
@@ -8,7 +9,60 @@ const SETTING_KEYS = {
     ONE_COMME_TEMPLATE_DIRECTORY: "oneCommeTemplateDirectory"
 }
 
+function stringFormat(format) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return format.replace(/{(\d+)}/g, function(match, number) {
+        return typeof args[number] != 'undefined'
+            ? args[number]
+            : match;
+    });
+}
+
+function registerMessageEvent(){
+    let messageList = document.querySelector("#messageList");
+    let listTemplate = `
+    <li class="{3}" style="border-left: 5px solid rgb({7})">
+        <section class="nameSection">
+            {0}
+            <strong class="name">{1}</strong>
+        </section>
+        <section class="contentSection">
+        {2}{4}
+        </section>
+        <section class="informationSection">
+        {5} {6}
+        </section>
+    </li>
+    `;
+
+    ipcRenderer.on("message", function(event, newMessageJsonString) {
+        let newMessages = JSON.parse(newMessageJsonString);
+        for (let message of newMessages) {
+            let time = new Date(message.data.timestamp);
+            let timeISOString = new Date(time.getTime() - (time.getTimezoneOffset() * 60000))
+                .toISOString().split("T");
+            
+            messageList.innerHTML = stringFormat(
+                listTemplate,
+                message.data.profileImage 
+                    ? `<img src="${message.data.profileImage}" class="avatar"/>`
+                    : "",
+                message.data.name,
+                message.data.comment,
+                message.service,
+                message.data.paidText 
+                    ? `<br/><strong class="donateText">(Donate: ${message.data.paidText})</strong>`
+                    : "",
+                `${timeISOString[0]} ${timeISOString[1].split(".")[0]}`,
+                message.name,
+                `${message.color.r},${message.color.g},${message.color.b}`)
+                + messageList.innerHTML;
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function(){
+    let youtubeLiveIdText = document.querySelector("#youtubeLiveId");
     let ecpayIdText = document.querySelector("#ecpayId");
     let ecpayFakeSourceCheckbox = document.querySelector("#ecpayFakeSource");
     let opayIdText = document.querySelector("#opayId");
@@ -17,14 +71,20 @@ document.addEventListener('DOMContentLoaded', function(){
     let oneCommeTemplateDirectoryText = document.querySelector("#onecommeTemplateDirectory");
     let connectButton = document.querySelector("#connectButton");
 
-    ecpayIdText.value = localStorage.getItem(SETTING_KEYS.ECPAY_ID) ?? "";
-    ecpayFakeSourceCheckbox.checked = (localStorage.getItem(SETTING_KEYS.ECPAY_FAKE_SOURCE) ?? "").toLowerCase() === "checked";
-    opayIdText.value = localStorage.getItem(SETTING_KEYS.OPAY_ID) ?? "";
-    opayFakeSourceCheckbox.checked = (localStorage.getItem(SETTING_KEYS.OPAY_FAKE_SOURCE) ?? "").toLowerCase() === "checked";
-    oneCommeUrlText.value = localStorage.getItem(SETTING_KEYS.ONE_COMME_URL) ?? "";
-    oneCommeTemplateDirectoryText.value = localStorage.getItem(SETTING_KEYS.ONE_COMME_TEMPLATE_DIRECTORY) ?? "";
+    ipcRenderer.on("loadConfig", function(event, configString) {
+        let config = JSON.parse(configString);
+        youtubeLiveIdText.value = config[SETTING_KEYS.YOUTUBE_LIVE_ID] ?? "";
+        ecpayIdText.value = config[SETTING_KEYS.ECPAY_ID] ?? "";
+        ecpayFakeSourceCheckbox.checked = (config[SETTING_KEYS.ECPAY_FAKE_SOURCE] ?? "").toLowerCase() === "checked";
+        opayIdText.value = config[SETTING_KEYS.OPAY_ID] ?? "";
+        opayFakeSourceCheckbox.checked = (config[SETTING_KEYS.OPAY_FAKE_SOURCE] ?? "").toLowerCase() === "checked";
+        oneCommeUrlText.value = config[SETTING_KEYS.ONE_COMME_URL] ?? "";
+        oneCommeTemplateDirectoryText.value = config[SETTING_KEYS.ONE_COMME_TEMPLATE_DIRECTORY] ?? "";
+    });
+    
     
     connectButton.addEventListener("click", function(){
+        youtubeLiveIdText.disabled = true;
         ecpayIdText.disabled = true;
         ecpayFakeSourceCheckbox.disabled = true;
         opayIdText.disabled = true;
@@ -33,6 +93,7 @@ document.addEventListener('DOMContentLoaded', function(){
         oneCommeTemplateDirectoryText.disabled = true;
         connectButton.disabled = true;
 
+        let youtubeLiveId = youtubeLiveIdText.value;
         let ecpayId = ecpayIdText.value;
         let ecpayFakeSource = ecpayFakeSourceCheckbox.checked;
         let opayId = opayIdText.value;
@@ -40,15 +101,22 @@ document.addEventListener('DOMContentLoaded', function(){
         let oneCommeUrl = oneCommeUrlText.value;
         let oneCommeTemplateDirectory = oneCommeTemplateDirectoryText.value;
         
-        localStorage.setItem(SETTING_KEYS.ECPAY_ID, ecpayId);
-        localStorage.setItem(SETTING_KEYS.ECPAY_FAKE_SOURCE, ecpayFakeSource ? "checked" : "unchecked");
-        localStorage.setItem(SETTING_KEYS.OPAY_ID, opayId);
-        localStorage.setItem(SETTING_KEYS.OPAY_FAKE_SOURCE, opayFakeSource ? "checked" : "unchecked");
-        localStorage.setItem(SETTING_KEYS.ONE_COMME_URL, oneCommeUrl);
-        localStorage.setItem(SETTING_KEYS.ONE_COMME_TEMPLATE_DIRECTORY, oneCommeTemplateDirectory);
+        let config = {};
+        config[SETTING_KEYS.YOUTUBE_LIVE_ID] = youtubeLiveId;
+        config[SETTING_KEYS.ECPAY_ID] = ecpayId;
+        config[SETTING_KEYS.ECPAY_FAKE_SOURCE] = ecpayFakeSource ? "checked" : "unchecked";
+        config[SETTING_KEYS.OPAY_ID] = opayId;
+        config[SETTING_KEYS.OPAY_FAKE_SOURCE] = opayFakeSource ? "checked" : "unchecked";
+        config[SETTING_KEYS.ONE_COMME_URL] = oneCommeUrl;
+        config[SETTING_KEYS.ONE_COMME_TEMPLATE_DIRECTORY] = oneCommeTemplateDirectory;
+        
+        ipcRenderer.send("saveConfig", JSON.stringify(config));
         ipcRenderer.send('connectToFetch', [
+            youtubeLiveId,
             ecpayId, ecpayFakeSource, 
             opayId, opayFakeSource, 
             oneCommeUrl, oneCommeTemplateDirectory]);
     });
+    
+    registerMessageEvent();
 });

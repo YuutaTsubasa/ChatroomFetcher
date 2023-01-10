@@ -14,6 +14,9 @@ public class OneCommeFetcher: IFetcher
 
     public OneCommeFetcher(string oneCommeUrl)
     {
+        if (string.IsNullOrEmpty(oneCommeUrl))
+            return;
+        
         _oneCommeUrl = oneCommeUrl;
         var baseUri = new Uri(oneCommeUrl);
         _commentJsonUrl = new Uri(baseUri, COMMENT_JSON_FILE_NAME);

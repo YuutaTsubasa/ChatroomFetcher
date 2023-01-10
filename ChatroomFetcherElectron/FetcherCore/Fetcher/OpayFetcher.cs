@@ -20,13 +20,16 @@ public class OpayFetcher : IFetcher
     private readonly string _animationUrl;
     private readonly string _checkDonateUrl;
 
-    private JsonObject[] _comments = Array.Empty<JsonObject>();
-    public JsonObject[] Comments => _comments;
-    
-    private readonly HashSet<string> _existedDonateId = new HashSet<string>();
+    public JsonObject[] Comments { get; private set; } =
+        Array.Empty<JsonObject>();
+
+    private readonly HashSet<string> _existedDonateId = new();
 
     public OpayFetcher(string id, bool shouldBeFakeSource)
     {
+        if (string.IsNullOrEmpty(id))
+            return;
+        
         _id = id;
         _shouldBeFakeSource = shouldBeFakeSource;
         _animationUrl = string.Format(
@@ -95,9 +98,9 @@ public class OpayFetcher : IFetcher
                             new KeyValuePair<string, JsonNode?>("url", _checkDonateUrl),
                             new KeyValuePair<string, JsonNode?>("color", new JsonObject(new[]
                             {
-                                new KeyValuePair<string, JsonNode?>("r", 56),
-                                new KeyValuePair<string, JsonNode?>("g", 119),
-                                new KeyValuePair<string, JsonNode?>("b", 0)
+                                new KeyValuePair<string, JsonNode?>("r", 18),
+                                new KeyValuePair<string, JsonNode?>("g", 42),
+                                new KeyValuePair<string, JsonNode?>("b", 179)
                             })),
                             new KeyValuePair<string, JsonNode?>("data", new JsonObject(new[]
                             {
@@ -130,7 +133,7 @@ public class OpayFetcher : IFetcher
                         });
                     });
 
-                _comments = _comments.Concat(newComments).ToArray();
+                Comments = Comments.Concat(newComments).ToArray();
             }
             catch (Exception exception)
             {

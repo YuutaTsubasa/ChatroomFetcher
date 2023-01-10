@@ -12,13 +12,16 @@ public class EcpayFetcher : IFetcher
     private readonly bool _shouldBeFakeSource;
     private readonly string _checkDonateUrl;
 
-    private JsonObject[] _comments = Array.Empty<JsonObject>();
-    public JsonObject[] Comments => _comments;
-    
-    private readonly HashSet<string> _existedDonateId = new HashSet<string>();
+    public JsonObject[] Comments { get; private set; } 
+        = Array.Empty<JsonObject>();
+
+    private readonly HashSet<string> _existedDonateId = new();
 
     public EcpayFetcher(string id, bool shouldBeFakeSource)
     {
+        if (string.IsNullOrEmpty(id))
+            return;
+        
         _id = id;
         _shouldBeFakeSource = shouldBeFakeSource;
         _checkDonateUrl = string.Format(
@@ -92,7 +95,7 @@ public class EcpayFetcher : IFetcher
                     });
                 });
             
-            _comments = _comments.Concat(newComments).ToArray();
+            Comments = Comments.Concat(newComments).ToArray();
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
     }

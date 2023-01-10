@@ -5,6 +5,8 @@ using ElectronNET.API;
 using ElectronNET.API.Entities;
 using Newtonsoft.Json.Linq;
 
+const string CONFIG_FILE_NAME = "config.json";
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -44,20 +46,27 @@ Task.Run(async () =>
 
     browserWindow.OnReadyToShow += () =>
     {
+        Electron.IpcMain.On("saveConfig", (args) =>
+        {
+            File.WriteAllText(CONFIG_FILE_NAME, (string)args);
+        });
+        
         Electron.IpcMain.On("connectToFetch", async (args) =>
         {
             try
             {
                 var argList = (JArray) args;
-                var ecpayId = (string) argList[0];
-                var ecpayFakeSource = (bool) argList[1];
-                var opayId = (string) argList[2];
-                var opayFakeSource = (bool) argList[3];
-                var oneCommeUrl = (string) argList[4];
-                var oneCommeTemplatePath = (string) argList[5];
+                var youtubeLiveId = (string) argList[0];
+                var ecpayId = (string) argList[1];
+                var ecpayFakeSource = (bool) argList[2];
+                var opayId = (string) argList[3];
+                var opayFakeSource = (bool) argList[4];
+                var oneCommeUrl = (string) argList[5];
+                var oneCommeTemplatePath = (string) argList[6];
 
                 var fetchers = new IFetcher[]
                 {
+                    new YoutubeFetcher(youtubeLiveId),
                     new EcpayFetcher(ecpayId, ecpayFakeSource),
                     new OpayFetcher(opayId, opayFakeSource),
                     new OneCommeFetcher(oneCommeUrl)
@@ -65,7 +74,11 @@ Task.Run(async () =>
                 
                 var writers = new IWriter[]
                 {
-                    new OneCommeWriter(oneCommeTemplatePath)
+                    new OneCommeWriter(oneCommeTemplatePath),
+                    new NewCommentActionWriter(newComments =>
+                    {
+                        Electron.IpcMain.Send(browserWindow, "message", JsonSerializer.Serialize(newComments));
+                    })
                 };
                 var cancellationTokenSource = new CancellationTokenSource();
                 await Task.WhenAll(fetchers.Select(fetcher => fetcher.Fetch(cancellationTokenSource.Token))
@@ -76,7 +89,15 @@ Task.Run(async () =>
                 Console.WriteLine(exception.Message);
                 Console.WriteLine(exception.StackTrace);
             }
+            
         });
+
+        if (File.Exists(CONFIG_FILE_NAME))
+        {
+            var configString = File.ReadAllText(CONFIG_FILE_NAME);
+            Electron.IpcMain.Send(browserWindow, "loadConfig", configString);
+        }
+        
         browserWindow.Show();
     };
 });
