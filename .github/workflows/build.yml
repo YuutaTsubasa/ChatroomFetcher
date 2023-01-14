@@ -9,21 +9,23 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - id: vars
-        run: |
-          os="${{ matrix.os }}";
-          platform=${os/ubuntu/linux}
-          echo "::set-output name=platform::${platform%"-latest"}"
-      - uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: 6.0.x
-      - name: Restore dependencies
-        run: dotnet restore
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
-      - name: Upload
-        uses: actions/upload-artifact@v3
-        with:
-          name: ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}
-          path: ChatroomFetcherElectron/bin/Release/net6.0
+    - uses: actions/github-script@v6
+      id: vars
+      with:
+        script: |
+          const os = "${{ matrix.os }}";
+          const platform = os.replace('ubuntu', 'linux');
+          core.setOutput("platform", platform.replace('-latest', ''));
+    - uses: actions/checkout@v3
+    - uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}
+        path: ChatroomFetcherElectron/bin/Release/net6.0
