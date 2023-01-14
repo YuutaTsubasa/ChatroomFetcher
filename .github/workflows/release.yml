@@ -50,7 +50,7 @@ jobs:
       run: dotnet build --no-restore --configuration Release
     - name: Create archive
       run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip ChatroomFetcherElectron/bin/Release/net6.0 -r
-      if: !startsWith(matrix.os, 'windows')
+      if: ${{ !startsWith(matrix.os, 'windows') }}
     - name: Create archive
       run: Compress-Archive ChatroomFetcherElectron/bin/Release/net6.0 ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
       if: startsWith(matrix.os, 'windows')
