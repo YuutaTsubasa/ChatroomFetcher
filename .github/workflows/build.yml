@@ -29,7 +29,9 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: electronize build /target "${{steps.vars.outputs.result}}"
+      run: |
+        dotnet tool install ElectronNET.CLI -g
+        electronize build /target "${{steps.vars.outputs.result}}"
     - name: Upload
       uses: actions/upload-artifact@v3
       with:
