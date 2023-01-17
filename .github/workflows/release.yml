@@ -40,29 +40,25 @@ jobs:
           const os = "${{ matrix.os }}";
           const platform = os.replace('ubuntu', 'linux');
           core.setOutput("platform", platform.replace('-latest', ''));
-          return os === "ubuntu-latest"
-            ? "linux"
-            : os === "macos-latest"
-              ? "osx"
-              : "win";
+          const target = platform.replace('macos', 'osx').replace('windows', 'win');
+          core.setOutput("target", target.replace('-latest', ''));
+          const targetDir = target.replace('-latest', '-unpacked');
+          core.setOutput("targetDir", targetDir.replace('osx-unpacked', 'mac'));
     - uses: actions/checkout@v3
-    - uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 6.0.x
     - uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 5.0.x
     - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
       run: |
+        dotnet restore
         dotnet tool install ElectronNET.CLI -g
-        electronize build /target "${{steps.vars.outputs.result}}"
+    - name: Build
+      run: electronize build /target ${{ steps.vars.outputs.target }}
     - name: Create archive
-      run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip ChatroomFetcherElectron/bin/Release/net6.0 -r
+      run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip bin/Desktop/${{ steps.vars.outputs.target }}-unpacked -r
       if: ${{ !startsWith(matrix.os, 'windows') }}
     - name: Create archive
-      run: Compress-Archive ChatroomFetcherElectron/bin/Release/net6.0 ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
+      run: Compress-Archive bin/Desktop/${{ steps.vars.outputs.targetDir }} ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
       if: startsWith(matrix.os, 'windows')
     - name: Upload Release
       uses: actions/upload-release-asset@v1
