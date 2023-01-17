@@ -42,8 +42,8 @@ jobs:
           core.setOutput("platform", platform.replace('-latest', ''));
           const target = platform.replace('macos', 'osx').replace('windows', 'win');
           core.setOutput("target", target.replace('-latest', ''));
-          const targetDir = target.replace('osx', 'mac');
-          core.setOutput("targetDir", targetDir.replace('-latest', ''));
+          const targetDir = target.replace('-latest', '-unpacked');
+          core.setOutput("targetDir", targetDir.replace('osx-unpacked', 'mac'));
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
@@ -58,7 +58,7 @@ jobs:
       run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip bin/Desktop/${{ steps.vars.outputs.target }}-unpacked -r
       if: ${{ !startsWith(matrix.os, 'windows') }}
     - name: Create archive
-      run: Compress-Archive bin/Desktop/${{ steps.vars.outputs.targetDir }}-unpacked ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
+      run: Compress-Archive bin/Desktop/${{ steps.vars.outputs.targetDir }} ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
       if: startsWith(matrix.os, 'windows')
     - name: Upload Release
       uses: actions/upload-release-asset@v1
