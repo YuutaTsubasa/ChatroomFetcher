@@ -18,18 +18,20 @@ jobs:
           core.setOutput("platform", platform.replace('-latest', ''));
           const target = platform.replace('macos', 'osx').replace('windows', 'win');
           core.setOutput("target", target.replace('-latest', ''));
+          const targetDir = target.replace('osx', 'mac');
+          core.setOutput("targetDir", targetDir.replace('-latest', ''));
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 5.0.x
     - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
       run: |
+        dotnet restore
         dotnet tool install ElectronNET.CLI -g
-        electronize build /target ${{ steps.vars.outputs.target }}
+    - name: Build
+      run: electronize build /target ${{ steps.vars.outputs.target }}
     - name: Upload
       uses: actions/upload-artifact@v3
       with:
         name: ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}
-        path: bin/Desktop/${{ steps.vars.outputs.target }}-unpacked
+        path: bin/Desktop/${{ steps.vars.outputs.targetDir }}-unpacked
