@@ -40,12 +40,9 @@ jobs:
           const os = "${{ matrix.os }}";
           const platform = os.replace('ubuntu', 'linux');
           core.setOutput("platform", platform.replace('-latest', ''));
-          return os === "ubuntu-latest"
-            ? "linux"
-            : os === "macos-latest"
-              ? "osx"
-              : "win";
-        result-encoding: string
+          const target = platform.replace('macos', 'osx');
+          const target = platform.replace('windows', 'win');
+          core.setOutput("target", target);
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
