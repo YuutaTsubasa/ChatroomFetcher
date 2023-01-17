@@ -16,6 +16,12 @@ jobs:
           const os = "${{ matrix.os }}";
           const platform = os.replace('ubuntu', 'linux');
           core.setOutput("platform", platform.replace('-latest', ''));
+          return os === "ubuntu-latest"
+            ? "linux"
+            : os === "macos-latest"
+              ? "osx"
+              : "win";
+        result-encoding: string
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
@@ -23,7 +29,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: electronize build /target "${{steps.vars.outputs.result}}"
     - name: Upload
       uses: actions/upload-artifact@v3
       with:
