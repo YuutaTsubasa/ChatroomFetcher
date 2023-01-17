@@ -40,16 +40,16 @@ jobs:
           const os = "${{ matrix.os }}";
           const platform = os.replace('ubuntu', 'linux');
           core.setOutput("platform", platform.replace('-latest', ''));
-          core.setOutput("target", "ubuntu-latest" ? "linux" : (os === "macos-latest" ? "osx" : "win"));
+          core.setOutput("target", "ubuntu-latest" ? "linux" : os === "macos-latest" ? "osx" : "win");
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7.0.x
+        dotnet-version: 5.0.x
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
       run: |
-        dotnet tool install h5.ElectronNET.CLI -g
+        dotnet tool install ElectronNET.CLI -g
         electronize build /target ${{ steps.vars.outputs.target }}
     - name: Create archive
       run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip bin/Desktop/${{ steps.vars.outputs.target }}-unpacked -r
