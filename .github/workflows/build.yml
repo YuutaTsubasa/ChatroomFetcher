@@ -26,7 +26,7 @@ jobs:
     - name: Build
       run: |
         dotnet tool install h5.ElectronNET.CLI -g
-        electronize build /target ${{ steps.vars.outputs.target }}
+        electronize-h5 build /target ${{ steps.vars.outputs.target }}
     - name: Upload
       uses: actions/upload-artifact@v3
       with:
