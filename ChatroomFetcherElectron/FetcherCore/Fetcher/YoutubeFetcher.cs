@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Drawing;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -15,6 +16,9 @@ public class YoutubeFetcher : IFetcher
 
     private const string GET_LIVE_CHAT_API_URI_FORMAT =
         "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={0}&prettyPrint=false";
+
+    private const string PAID_TEXT_REGEX_PATTERN =
+        @"([^0-9]*)([0-9,.]+)";
 
     private readonly string _liveId;
     private readonly Uri _liveChatApiUri;
@@ -107,7 +111,12 @@ public class YoutubeFetcher : IFetcher
                 ytInitialDataJsonObject["contents"]["liveChatRenderer"]["actions"]
                     ?.AsArray()
                     .Where(jsonObject => jsonObject["addChatItemAction"] != null)
-                    .Select(jsonObject => jsonObject["addChatItemAction"]["item"]["liveChatTextMessageRenderer"])
+                    .Select(jsonObject => 
+                        jsonObject?["addChatItemAction"]?["item"]?["liveChatTextMessageRenderer"] ??
+                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidMessageRenderer"] ??
+                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidStickerRenderer"] ??
+                        jsonObject?["addLiveChatTickerItemAction"]?["item"]?["liveChatTickerPaidMessageItemRenderer"]
+                            ?["showItemEndpoint"]?["showLiveChatItemEndpoint"]?["renderer"]?["liveChatPaidMessageRenderer"])
                     .Where(renderer => renderer != null)
                     .ToArray() ?? Array.Empty<JsonNode>());
             Comments = Comments.Concat(initialComments).ToArray();
@@ -151,10 +160,15 @@ public class YoutubeFetcher : IFetcher
                     contentJsonObject["continuationContents"]["liveChatContinuation"]["continuations"][0]
                     ["invalidationContinuationData"]["continuation"].GetValue<string>();
                 
-                var addChatItemRenderers = contentJsonObject?["continuationContents"]?["liveChatContinuation"]?["actions"]
-                    ?.AsArray()
+                var addChatItemRenderers = 
+                    contentJsonObject?["continuationContents"]?["liveChatContinuation"]?["actions"]?.AsArray()
                     .Where(jsonObject => jsonObject["addChatItemAction"] != null)
-                    .Select(jsonObject => jsonObject["addChatItemAction"]["item"]["liveChatTextMessageRenderer"])
+                    .Select(jsonObject => 
+                        jsonObject?["addChatItemAction"]?["item"]?["liveChatTextMessageRenderer"] ??
+                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidMessageRenderer"] ??
+                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidStickerRenderer"] ??
+                        jsonObject?["addLiveChatTickerItemAction"]?["item"]?["liveChatTickerPaidMessageItemRenderer"]
+                            ?["showItemEndpoint"]?["showLiveChatItemEndpoint"]?["renderer"]?["liveChatPaidMessageRenderer"])
                     .Where(renderer => renderer != null)
                     .ToArray() ?? Array.Empty<JsonNode>();
                 var comments = _ConvertToComments(addChatItemRenderers);
@@ -187,8 +201,9 @@ public class YoutubeFetcher : IFetcher
                         : string.Empty)
                 }))
                 .ToArray() ?? Array.Empty<JsonObject>();
-            
-            return new JsonObject(new[]
+
+            var paidText = renderer?["purchaseAmountText"]?["simpleText"]?.GetValue<string>() ?? string.Empty;
+            var result = new JsonObject(new[]
             {
                 new KeyValuePair<string, JsonNode?>("id", $"youtube"),
                 new KeyValuePair<string, JsonNode?>("service", "youtube"),
@@ -202,31 +217,26 @@ public class YoutubeFetcher : IFetcher
                 })),
                 new KeyValuePair<string, JsonNode?>("data", new JsonObject(new[]
                 {
-                    new KeyValuePair<string, JsonNode?>("id", renderer["id"].GetValue<string>()),
+                    new KeyValuePair<string, JsonNode?>("id", $"yt-{renderer["id"].GetValue<string>()}"),
                     new KeyValuePair<string, JsonNode?>("liveId", _liveId),
                     new KeyValuePair<string, JsonNode?>("userId",
-                        renderer["authorExternalChannelId"].GetValue<string>()),
+                        $"yt-{renderer["authorExternalChannelId"].GetValue<string>()}"),
                     new KeyValuePair<string, JsonNode?>("name", name),
                     new KeyValuePair<string, JsonNode?>("profileImage", profileImage),
-                    // TODO: need to parse badge.
                     new KeyValuePair<string, JsonNode?>("badges", new JsonArray(badges)),
                     new KeyValuePair<string, JsonNode?>("isOwner", badges.Any(badge => badge["label"].GetValue<string>() == "OWNER")),
                     new KeyValuePair<string, JsonNode?>("isModerator", badges.Any(badge => badge["label"].GetValue<string>() == "MODERATOR")),
                     new KeyValuePair<string, JsonNode?>("isMember", badges.Any(badge => !string.IsNullOrEmpty(badge["url"].GetValue<string>()))),
                     new KeyValuePair<string, JsonNode?>("autoModerated", false),
-                    // need to parse badge end.
                     new KeyValuePair<string, JsonNode?>("hasGift", false),
                     new KeyValuePair<string, JsonNode?>("comment", string.Join(string.Empty,
-                        renderer["message"]["runs"].AsArray()
+                        renderer?["message"]?["runs"]?.AsArray()
                             .Select(run => run.AsObject().ContainsKey("emoji")
                                 ? $"<img src=\"{run["emoji"]["image"]["thumbnails"][0]["url"].GetValue<string>()}\"/>"
-                                : run["text"].GetValue<string>()))),
+                                : run["text"].GetValue<string>()) ??
+                        new [] {$"<img src=\"{renderer?["sticker"]?["thumbnails"][0]["url"].GetValue<string>()}\"/>" })),
                     new KeyValuePair<string, JsonNode?>("timestamp",
                         double.Parse(renderer["timestampUsec"].GetValue<string>()) / 1000.0),
-                    new KeyValuePair<string, JsonNode?>("paidText", string.Empty),
-                    new KeyValuePair<string, JsonNode?>("unit", string.Empty),
-                    new KeyValuePair<string, JsonNode?>("price", string.Empty),
-                    new KeyValuePair<string, JsonNode?>("colors", new JsonObject()),
                     new KeyValuePair<string, JsonNode?>("displayName", name),
                     new KeyValuePair<string, JsonNode?>("originalProfileImage", profileImage),
                     new KeyValuePair<string, JsonNode?>("isFirstTime", true)
@@ -236,5 +246,38 @@ public class YoutubeFetcher : IFetcher
                     new KeyValuePair<string, JsonNode?>("interval", 0)
                 }))
             });
+
+            if (!string.IsNullOrEmpty(paidText))
+            {
+                var paidTextRegex = new Regex(PAID_TEXT_REGEX_PATTERN);
+                var paidTextMatches = paidTextRegex.Matches(paidText);
+
+                var colorKeys = new Dictionary<string, string[]>
+                {
+                    {"headerBackgroundColor", new [] {"headerBackgroundColor", "moneyChipBackgroundColor"}},
+                    {"headerTextColor", new [] {"headerTextColor", "moneyChipTextColor"}},
+                    {"bodyBackgroundColor", new [] {"bodyBackgroundColor", "backgroundColor"}},
+                    {"bodyTextColor", new [] {"bodyBackgroundColor", "moneyChipTextColor"}},
+                    {"authorNameTextColor", new [] {"authorNameTextColor"}},
+                    {"timestampColor", new [] {"timestampColor"}}
+                };
+                
+                result["data"].AsObject().Add("paidText", paidText);
+                result["data"].AsObject().Add("unit", 
+                    paidTextMatches.Count > 0 ? paidTextMatches[0].Groups[0].Value : string.Empty);
+                result["data"].AsObject().Add("price", 
+                    paidTextMatches.Count > 0 ? paidTextMatches[0].Groups[1].Value : string.Empty);
+                result["data"].AsObject().Add("colors", new JsonObject(colorKeys
+                    .Where(keyGroup => keyGroup.Value.Any(key => renderer[key] != null))
+                    .Select(keyGroup => (Key: keyGroup.Key, Value: keyGroup.Value.First(key => renderer[key] != null)))
+                    .Select(keyGroup =>
+                        new KeyValuePair<string, JsonNode?>(keyGroup.Key,
+                            _ToCssColorString(Color.FromArgb(unchecked((int) renderer[keyGroup.Value].GetValue<uint>())))))));
+            }
+
+            return result;
         });
+
+    private string _ToCssColorString(Color color)
+        => $"rgba({color.R},{color.G},{color.B},{color.A / 255f})";
 }
