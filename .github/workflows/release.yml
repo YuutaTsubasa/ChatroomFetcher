@@ -40,19 +40,22 @@ jobs:
           const os = "${{ matrix.os }}";
           const platform = os.replace('ubuntu', 'linux');
           core.setOutput("platform", platform.replace('-latest', ''));
+          core.setOutput("target", "ubuntu-latest" ? "linux" : (os === "macos-latest" ? "osx" : "win"));
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: 7.0.x
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: |
+        dotnet tool install h5.ElectronNET.CLI -g
+        electronize build /target ${{ steps.vars.outputs.target }}
     - name: Create archive
-      run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip ChatroomFetcherElectron/bin/Release/net6.0 -r
+      run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip bin/Desktop/${{ steps.vars.outputs.target }}-unpacked -r
       if: ${{ !startsWith(matrix.os, 'windows') }}
     - name: Create archive
-      run: Compress-Archive ChatroomFetcherElectron/bin/Release/net6.0 ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
+      run: Compress-Archive bin/Desktop/${{ steps.vars.outputs.target }}-unpacked ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
       if: startsWith(matrix.os, 'windows')
     - name: Upload Release
       uses: actions/upload-release-asset@v1

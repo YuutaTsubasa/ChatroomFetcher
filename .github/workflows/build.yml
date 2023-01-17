@@ -16,16 +16,11 @@ jobs:
           const os = "${{ matrix.os }}";
           const platform = os.replace('ubuntu', 'linux');
           core.setOutput("platform", platform.replace('-latest', ''));
-          return os === "ubuntu-latest"
-            ? "linux"
-            : os === "macos-latest"
-              ? "osx"
-              : "win";
-        result-encoding: string
+          core.setOutput("target", "ubuntu-latest" ? "linux" : (os === "macos-latest" ? "osx" : "win"));
     - uses: actions/checkout@v3
     - uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: 7.0.x
     - uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 5.0.0
@@ -33,10 +28,10 @@ jobs:
       run: dotnet restore
     - name: Build
       run: |
-        dotnet tool install ElectronNET.CLI -g
-        electronize build /target "${{steps.vars.outputs.result}}"
+        dotnet tool install h5.ElectronNET.CLI -g
+        electronize build /target ${{ steps.vars.outputs.target }}
     - name: Upload
       uses: actions/upload-artifact@v3
       with:
         name: ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}
-        path: ChatroomFetcherElectron/bin/Release/net6.0
+        path: bin/Desktop/${{ steps.vars.outputs.target }}-unpacked
