@@ -10,8 +10,8 @@
   "build": {
     "appId": "com.ChatroomFetcherElectron.app",
     "productName": "ChatroomFetcherElectron",
-    "copyright": "Copyright © 2020",
-    "buildVersion": "1.0.0",
+    "copyright": "Copyright © 2023",
+    "buildVersion": "0.0.3",
     "compression": "maximum",
     "directories": {
       "output": "../../../bin/Desktop"
