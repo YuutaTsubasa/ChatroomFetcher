@@ -44,6 +44,8 @@ Task.Run(async () =>
         Show = false
     });
 
+    await browserWindow.WebContents.Session.ClearCacheAsync();
+
     browserWindow.OnReadyToShow += () =>
     {
         Electron.IpcMain.On("saveConfig", (args) =>
