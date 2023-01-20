@@ -55,7 +55,7 @@ jobs:
     - name: Build
       run: electronize build /target ${{ steps.vars.outputs.target }}
     - name: Create archive
-      run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip bin/Desktop/${{ steps.vars.outputs.target }}-unpacked -r
+      run: zip ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip bin/Desktop/${{ steps.vars.outputs.targetDir }} -r
       if: ${{ !startsWith(matrix.os, 'windows') }}
     - name: Create archive
       run: Compress-Archive bin/Desktop/${{ steps.vars.outputs.targetDir }} ChatroomFetcherElectron-${{ steps.vars.outputs.platform }}.zip
