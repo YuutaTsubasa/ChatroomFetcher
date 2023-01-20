@@ -99,7 +99,9 @@ document.addEventListener('DOMContentLoaded', function(){
         oneCommeTemplateDirectoryText.disabled = true;
         connectButton.disabled = true;
 
-        let backupFilePath = backupFilePathFileInput.files[0].path;
+        let backupFilePath = backupFilePathFileInput.files.length > 0 
+            ? backupFilePathFileInput.files[0].path 
+            : "";
         let shouldBackup = shouldBackupCheckbox.checked;
         let youtubeLiveId = youtubeLiveIdText.value;
         let ecpayId = ecpayIdText.value;
