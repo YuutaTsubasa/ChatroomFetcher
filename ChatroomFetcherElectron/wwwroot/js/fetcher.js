@@ -1,5 +1,6 @@
 ﻿const { ipcRenderer } = require('electron');
 const SETTING_KEYS = {
+    SHOULD_BACKUP: "shouldBackup",
     YOUTUBE_LIVE_ID: "youtubeLiveId",
     ECPAY_ID: "ecpayId",
     ECPAY_FAKE_SOURCE: "ecpayFakeSource",
@@ -62,6 +63,8 @@ function registerMessageEvent(){
 }
 
 document.addEventListener('DOMContentLoaded', function(){
+    let backupFilePathFileInput = document.querySelector("#backupFilePath");
+    let shouldBackupCheckbox = document.querySelector("#shouldBackup");
     let youtubeLiveIdText = document.querySelector("#youtubeLiveId");
     let ecpayIdText = document.querySelector("#ecpayId");
     let ecpayFakeSourceCheckbox = document.querySelector("#ecpayFakeSource");
@@ -73,6 +76,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     ipcRenderer.on("loadConfig", function(event, configString) {
         let config = JSON.parse(configString);
+        shouldBackupCheckbox.checked = (config[SETTING_KEYS.SHOULD_BACKUP] ?? "checked").toLowerCase() === "checked";
         youtubeLiveIdText.value = config[SETTING_KEYS.YOUTUBE_LIVE_ID] ?? "";
         ecpayIdText.value = config[SETTING_KEYS.ECPAY_ID] ?? "";
         ecpayFakeSourceCheckbox.checked = (config[SETTING_KEYS.ECPAY_FAKE_SOURCE] ?? "").toLowerCase() === "checked";
@@ -84,6 +88,8 @@ document.addEventListener('DOMContentLoaded', function(){
     
     
     connectButton.addEventListener("click", function(){
+        backupFilePathFileInput.disabled = true;
+        shouldBackupCheckbox.disabled = true;
         youtubeLiveIdText.disabled = true;
         ecpayIdText.disabled = true;
         ecpayFakeSourceCheckbox.disabled = true;
@@ -93,6 +99,10 @@ document.addEventListener('DOMContentLoaded', function(){
         oneCommeTemplateDirectoryText.disabled = true;
         connectButton.disabled = true;
 
+        let backupFilePath = backupFilePathFileInput.files.length > 0 
+            ? backupFilePathFileInput.files[0].path 
+            : "";
+        let shouldBackup = shouldBackupCheckbox.checked;
         let youtubeLiveId = youtubeLiveIdText.value;
         let ecpayId = ecpayIdText.value;
         let ecpayFakeSource = ecpayFakeSourceCheckbox.checked;
@@ -102,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function(){
         let oneCommeTemplateDirectory = oneCommeTemplateDirectoryText.value;
         
         let config = {};
+        config[SETTING_KEYS.SHOULD_BACKUP] = shouldBackup ? "checked" : "unchecked";
         config[SETTING_KEYS.YOUTUBE_LIVE_ID] = youtubeLiveId;
         config[SETTING_KEYS.ECPAY_ID] = ecpayId;
         config[SETTING_KEYS.ECPAY_FAKE_SOURCE] = ecpayFakeSource ? "checked" : "unchecked";
@@ -112,6 +123,7 @@ document.addEventListener('DOMContentLoaded', function(){
         
         ipcRenderer.send("saveConfig", JSON.stringify(config));
         ipcRenderer.send('connectToFetch', [
+            backupFilePath, shouldBackup,
             youtubeLiveId,
             ecpayId, ecpayFakeSource, 
             opayId, opayFakeSource, 

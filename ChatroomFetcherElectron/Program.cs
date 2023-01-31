@@ -44,6 +44,8 @@ Task.Run(async () =>
         Show = false
     });
 
+    await browserWindow.WebContents.Session.ClearCacheAsync();
+
     browserWindow.OnReadyToShow += () =>
     {
         Electron.IpcMain.On("saveConfig", (args) =>
@@ -56,16 +58,19 @@ Task.Run(async () =>
             try
             {
                 var argList = (JArray) args;
-                var youtubeLiveId = (string) argList[0];
-                var ecpayId = (string) argList[1];
-                var ecpayFakeSource = (bool) argList[2];
-                var opayId = (string) argList[3];
-                var opayFakeSource = (bool) argList[4];
-                var oneCommeUrl = (string) argList[5];
-                var oneCommeTemplatePath = (string) argList[6];
+                var backupFilePath = (string) argList[0];
+                var shouldBackup = (bool) argList[1];
+                var youtubeLiveId = (string) argList[2];
+                var ecpayId = (string) argList[3];
+                var ecpayFakeSource = (bool) argList[4];
+                var opayId = (string) argList[5];
+                var opayFakeSource = (bool) argList[6];
+                var oneCommeUrl = (string) argList[7];
+                var oneCommeTemplatePath = (string) argList[8];
 
                 var fetchers = new IFetcher[]
                 {
+                    new BackupFetcher(backupFilePath),
                     new YoutubeFetcher(youtubeLiveId),
                     new EcpayFetcher(ecpayId, ecpayFakeSource),
                     new OpayFetcher(opayId, opayFakeSource),
@@ -79,7 +84,11 @@ Task.Run(async () =>
                     {
                         Electron.IpcMain.Send(browserWindow, "message", JsonSerializer.Serialize(newComments));
                     })
-                };
+                }.Concat(shouldBackup 
+                    ? new IWriter[] { new BackupWriter() }
+                    : Array.Empty<IWriter>())
+                .ToArray();
+                
                 var cancellationTokenSource = new CancellationTokenSource();
                 await Task.WhenAll(fetchers.Select(fetcher => fetcher.Fetch(cancellationTokenSource.Token))
                     .Append(WriteAllComments(fetchers, writers, cancellationTokenSource.Token)));
