@@ -11,6 +11,16 @@ namespace ChatroomFetcherElectron.FetcherCore.Fetcher;
 
 public class YoutubeFetcher : IFetcher
 {
+    private enum RendererType
+    {
+        LiveChatTextMessageRenderer,
+        LiveChatPaidMessageRenderer,
+        LiveChatPaidStickerRenderer,
+        LiveChatMembershipItemRenderer,
+        LiveChatSponsorshipsGiftPurchaseAnnouncementRenderer,
+        LiveChatSponsorshipsGiftRedemptionAnnouncementRenderer
+    }
+    
     private const string LIVE_CHAT_API_URI_FORMAT =
         "https://www.youtube.com/live_chat?is_popout=1&v={0}";
 
@@ -104,20 +114,15 @@ public class YoutubeFetcher : IFetcher
                 .Value;
             var ytInitialDataJsonObject = JsonSerializer.Deserialize<JsonObject>(ytInitialDataJsonContent);
             var continuation =
-                ytInitialDataJsonObject["contents"]["liveChatRenderer"]["continuations"][0][
-                    "invalidationContinuationData"]["continuation"].GetValue<string>();
+                ytInitialDataJsonObject["contents"]["liveChatRenderer"]["continuations"][0]
+                    ["invalidationContinuationData"]["continuation"].GetValue<string>();
 
-            var initialComments = _ConvertToComments(
+            var existedUserIds = new HashSet<string>();
+            var initialComments = _ConvertToComments(existedUserIds,
                 ytInitialDataJsonObject["contents"]["liveChatRenderer"]["actions"]
                     ?.AsArray()
                     .Where(jsonObject => jsonObject["addChatItemAction"] != null)
-                    .Select(jsonObject => 
-                        jsonObject?["addChatItemAction"]?["item"]?["liveChatTextMessageRenderer"] ??
-                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidMessageRenderer"] ??
-                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidStickerRenderer"] ??
-                        jsonObject?["addLiveChatTickerItemAction"]?["item"]?["liveChatTickerPaidMessageItemRenderer"]
-                            ?["showItemEndpoint"]?["showLiveChatItemEndpoint"]?["renderer"]?["liveChatPaidMessageRenderer"])
-                    .Where(renderer => renderer != null)
+                    .Select(jsonObject => jsonObject?["addChatItemAction"]?["item"])
                     .ToArray() ?? Array.Empty<JsonNode>());
             Comments = Comments.Concat(initialComments).ToArray();
             
@@ -160,18 +165,12 @@ public class YoutubeFetcher : IFetcher
                     contentJsonObject["continuationContents"]["liveChatContinuation"]["continuations"][0]
                     ["invalidationContinuationData"]["continuation"].GetValue<string>();
                 
-                var addChatItemRenderers = 
+                var items = 
                     contentJsonObject?["continuationContents"]?["liveChatContinuation"]?["actions"]?.AsArray()
-                    .Where(jsonObject => jsonObject["addChatItemAction"] != null)
-                    .Select(jsonObject => 
-                        jsonObject?["addChatItemAction"]?["item"]?["liveChatTextMessageRenderer"] ??
-                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidMessageRenderer"] ??
-                        jsonObject?["addChatItemAction"]?["item"]?["liveChatPaidStickerRenderer"] ??
-                        jsonObject?["addLiveChatTickerItemAction"]?["item"]?["liveChatTickerPaidMessageItemRenderer"]
-                            ?["showItemEndpoint"]?["showLiveChatItemEndpoint"]?["renderer"]?["liveChatPaidMessageRenderer"])
-                    .Where(renderer => renderer != null)
+                    .Where(jsonObject => jsonObject?["addChatItemAction"] != null)
+                    .Select(jsonObject => jsonObject?["addChatItemAction"]?["item"])
                     .ToArray() ?? Array.Empty<JsonNode>();
-                var comments = _ConvertToComments(addChatItemRenderers);
+                var comments = _ConvertToComments(existedUserIds, items);
                 Comments = Comments.Concat(comments).ToArray();
 
                 await Task.Delay(TimeSpan.FromSeconds(5));
@@ -184,99 +183,175 @@ public class YoutubeFetcher : IFetcher
         }
     }
 
-    private IEnumerable<JsonObject> _ConvertToComments(JsonNode?[] addChatItemRenderers) =>
-        addChatItemRenderers.Select(renderer =>
+    private IEnumerable<JsonObject> _ConvertToComments(HashSet<string> existedUserIds, JsonNode?[] items) =>
+        items.Select(item =>
         {
-            var name = renderer["authorName"]["simpleText"].GetValue<string>();
-            var profileImage = renderer["authorPhoto"]["thumbnails"][0]["url"].GetValue<string>();
-            var badges = renderer["authorBadges"]?.AsArray()
-                .Select(badge => badge["liveChatAuthorBadgeRenderer"])
-                .Select(renderer => new JsonObject(new[]
-                {
-                    new KeyValuePair<string, JsonNode?>("label", renderer["icon"] != null
-                        ? renderer["icon"]["iconType"].GetValue<string>()
-                        : renderer["tooltip"].GetValue<string>()),
-                    new KeyValuePair<string, JsonNode?>("url", renderer["customThumbnail"] != null
-                        ? renderer["customThumbnail"]["thumbnails"][0]["url"].GetValue<string>()
-                        : string.Empty)
-                }))
-                .ToArray() ?? Array.Empty<JsonObject>();
+            var liveChatTextMessageRenderer = item?["liveChatTextMessageRenderer"];
+            if (liveChatTextMessageRenderer != null)
+                return _ConvertToComment(RendererType.LiveChatTextMessageRenderer, existedUserIds, liveChatTextMessageRenderer);
 
-            var paidText = renderer?["purchaseAmountText"]?["simpleText"]?.GetValue<string>() ?? string.Empty;
-            var result = new JsonObject(new[]
+            var liveChatPaidMessageRenderer = item?["liveChatPaidMessageRenderer"];
+            if (liveChatPaidMessageRenderer != null)
+                return _ConvertToComment(RendererType.LiveChatPaidMessageRenderer, existedUserIds, liveChatPaidMessageRenderer);
+
+            var liveChatPaidStickerRenderer = item?["liveChatPaidStickerRenderer"];
+            if (liveChatPaidStickerRenderer != null)
+                return _ConvertToComment(RendererType.LiveChatPaidStickerRenderer, existedUserIds, liveChatPaidStickerRenderer);
+
+            var liveChatMembershipItemRenderer = item?["liveChatMembershipItemRenderer"];
+            if (liveChatMembershipItemRenderer != null)
+                return _ConvertToComment(RendererType.LiveChatMembershipItemRenderer, existedUserIds, liveChatMembershipItemRenderer);
+
+            var liveChatSponsorshipsGiftPurchaseAnnouncementRenderer =
+                item?["liveChatSponsorshipsGiftPurchaseAnnouncementRenderer"];
+            if (liveChatSponsorshipsGiftPurchaseAnnouncementRenderer != null)
+                return _ConvertToComment(RendererType.LiveChatSponsorshipsGiftPurchaseAnnouncementRenderer,
+                    existedUserIds, liveChatSponsorshipsGiftPurchaseAnnouncementRenderer);
+            
+            var liveChatSponsorshipsGiftRedemptionAnnouncementRenderer =
+                item?["liveChatSponsorshipsGiftRedemptionAnnouncementRenderer"];
+            if (liveChatSponsorshipsGiftRedemptionAnnouncementRenderer != null)
+                return _ConvertToComment(RendererType.LiveChatSponsorshipsGiftRedemptionAnnouncementRenderer,
+                    existedUserIds, liveChatSponsorshipsGiftRedemptionAnnouncementRenderer);
+
+            return null;
+        }).Where(comment => comment != null)!;
+
+    private string _ConvertRunNode(JsonNode? runNode)
+        => runNode.AsObject().ContainsKey("emoji")
+            ? $"<img src=\"{runNode["emoji"]["image"]["thumbnails"][0]["url"].GetValue<string>()}\"/>"
+            : _BoldText(runNode, _ItalicText(runNode, runNode["text"].GetValue<string>()));
+
+    private string _DecorateText(JsonNode? runNode, string nodeName, string htmlName, string text)
+        => runNode.AsObject().ContainsKey(nodeName) && runNode[nodeName].GetValue<bool>()
+            ? $"<{htmlName}>{text}</{htmlName}>"
+            : text;
+
+    private string _BoldText(JsonNode? runNode, string text)
+        => _DecorateText(runNode, "bold", "strong", text);
+    
+    private string _ItalicText(JsonNode? runNode, string text)
+        => _DecorateText(runNode, "italic", "em", text);
+
+    private JsonObject _ConvertToComment(RendererType rendererType, HashSet<string> existedUserIds, JsonNode? renderer)
+    {
+        var name = renderer["authorName"]["simpleText"].GetValue<string>();
+        var profileImage = renderer["authorPhoto"]["thumbnails"][0]["url"].GetValue<string>();
+        var badges = renderer["authorBadges"]?.AsArray()
+            .Select(badge => badge["liveChatAuthorBadgeRenderer"])
+            .Select(renderer => new JsonObject(new[]
             {
-                new KeyValuePair<string, JsonNode?>("id", $"youtube"),
-                new KeyValuePair<string, JsonNode?>("service", "youtube"),
-                new KeyValuePair<string, JsonNode?>("name", "Youtube 訊息"),
-                new KeyValuePair<string, JsonNode?>("url", $"https://youtu.be/{_liveId}"),
-                new KeyValuePair<string, JsonNode?>("color", new JsonObject(new[]
-                {
-                    new KeyValuePair<string, JsonNode?>("r", 255),
-                    new KeyValuePair<string, JsonNode?>("g", 5),
-                    new KeyValuePair<string, JsonNode?>("b", 5)
-                })),
-                new KeyValuePair<string, JsonNode?>("data", new JsonObject(new[]
-                {
-                    new KeyValuePair<string, JsonNode?>("id", $"yt-{renderer["id"].GetValue<string>()}"),
-                    new KeyValuePair<string, JsonNode?>("liveId", _liveId),
-                    new KeyValuePair<string, JsonNode?>("userId",
-                        $"yt-{renderer["authorExternalChannelId"].GetValue<string>()}"),
-                    new KeyValuePair<string, JsonNode?>("name", name),
-                    new KeyValuePair<string, JsonNode?>("profileImage", profileImage),
-                    new KeyValuePair<string, JsonNode?>("badges", new JsonArray(badges)),
-                    new KeyValuePair<string, JsonNode?>("isOwner", badges.Any(badge => badge["label"].GetValue<string>() == "OWNER")),
-                    new KeyValuePair<string, JsonNode?>("isModerator", badges.Any(badge => badge["label"].GetValue<string>() == "MODERATOR")),
-                    new KeyValuePair<string, JsonNode?>("isMember", badges.Any(badge => !string.IsNullOrEmpty(badge["url"].GetValue<string>()))),
-                    new KeyValuePair<string, JsonNode?>("autoModerated", false),
-                    new KeyValuePair<string, JsonNode?>("hasGift", false),
-                    new KeyValuePair<string, JsonNode?>("comment", string.Join(string.Empty,
-                        renderer?["message"]?["runs"]?.AsArray()
-                            .Select(run => run.AsObject().ContainsKey("emoji")
-                                ? $"<img src=\"{run["emoji"]["image"]["thumbnails"][0]["url"].GetValue<string>()}\"/>"
-                                : run["text"].GetValue<string>()) ??
-                        new [] {$"<img src=\"{renderer?["sticker"]?["thumbnails"][0]["url"].GetValue<string>()}\"/>" })),
-                    new KeyValuePair<string, JsonNode?>("timestamp",
-                        double.Parse(renderer["timestampUsec"].GetValue<string>()) / 1000.0),
-                    new KeyValuePair<string, JsonNode?>("displayName", name),
-                    new KeyValuePair<string, JsonNode?>("originalProfileImage", profileImage),
-                    new KeyValuePair<string, JsonNode?>("isFirstTime", true)
-                })),
-                new KeyValuePair<string, JsonNode?>("meta", new JsonObject(new[]
-                {
-                    new KeyValuePair<string, JsonNode?>("interval", 0)
-                }))
-            });
-
-            if (!string.IsNullOrEmpty(paidText))
+                new KeyValuePair<string, JsonNode?>("label", renderer["icon"] != null
+                    ? renderer["icon"]["iconType"].GetValue<string>()
+                    : renderer["tooltip"].GetValue<string>()),
+                new KeyValuePair<string, JsonNode?>("url", renderer["customThumbnail"] != null
+                    ? renderer["customThumbnail"]["thumbnails"][0]["url"].GetValue<string>()
+                    : string.Empty)
+            }))
+            .ToArray() ?? Array.Empty<JsonObject>();
+        var paidText = renderer?["purchaseAmountText"]?["simpleText"]?.GetValue<string>() ?? string.Empty;
+        var comment = string.Join(string.Empty,
+           renderer?["message"]?["runs"]?.AsArray().Select(_ConvertRunNode) ??
+           renderer?["headerSubtext"]?["runs"]?.AsArray().Select(_ConvertRunNode) ??
+           new [] {$"<img src=\"{renderer?["sticker"]?["thumbnails"][0]["url"].GetValue<string>()}\"/>"});
+        var userId = $"yt-{renderer["authorExternalChannelId"].GetValue<string>()}";
+        var isFirstTime = !existedUserIds.Contains(userId);
+        existedUserIds.Add(userId);
+        
+        var result = new JsonObject(new[]
+        {
+            new KeyValuePair<string, JsonNode?>("id", $"youtube"),
+            new KeyValuePair<string, JsonNode?>("service", "youtube"),
+            new KeyValuePair<string, JsonNode?>("name", "Youtube 訊息"),
+            new KeyValuePair<string, JsonNode?>("url", $"https://youtu.be/{_liveId}"),
+            new KeyValuePair<string, JsonNode?>("color", new JsonObject(new[]
             {
-                var paidTextRegex = new Regex(PAID_TEXT_REGEX_PATTERN);
-                var paidTextMatches = paidTextRegex.Matches(paidText);
-
-                var colorKeys = new Dictionary<string, string[]>
-                {
-                    {"headerBackgroundColor", new [] {"headerBackgroundColor", "moneyChipBackgroundColor"}},
-                    {"headerTextColor", new [] {"headerTextColor", "moneyChipTextColor"}},
-                    {"bodyBackgroundColor", new [] {"bodyBackgroundColor", "backgroundColor"}},
-                    {"bodyTextColor", new [] {"bodyBackgroundColor", "moneyChipTextColor"}},
-                    {"authorNameTextColor", new [] {"authorNameTextColor"}},
-                    {"timestampColor", new [] {"timestampColor"}}
-                };
-                
-                result["data"].AsObject().Add("paidText", paidText);
-                result["data"].AsObject().Add("unit", 
-                    paidTextMatches.Count > 0 ? paidTextMatches[0].Groups[0].Value : string.Empty);
-                result["data"].AsObject().Add("price", 
-                    paidTextMatches.Count > 0 ? paidTextMatches[0].Groups[1].Value : string.Empty);
-                result["data"].AsObject().Add("colors", new JsonObject(colorKeys
-                    .Where(keyGroup => keyGroup.Value.Any(key => renderer[key] != null))
-                    .Select(keyGroup => (Key: keyGroup.Key, Value: keyGroup.Value.First(key => renderer[key] != null)))
-                    .Select(keyGroup =>
-                        new KeyValuePair<string, JsonNode?>(keyGroup.Key,
-                            _ToCssColorString(Color.FromArgb(unchecked((int) renderer[keyGroup.Value].GetValue<uint>())))))));
-            }
-
-            return result;
+                new KeyValuePair<string, JsonNode?>("r", 255),
+                new KeyValuePair<string, JsonNode?>("g", 5),
+                new KeyValuePair<string, JsonNode?>("b", 5)
+            })),
+            new KeyValuePair<string, JsonNode?>("data", new JsonObject(new[]
+            {
+                new KeyValuePair<string, JsonNode?>("id", $"yt-{renderer["id"].GetValue<string>()}"),
+                new KeyValuePair<string, JsonNode?>("liveId", _liveId),
+                new KeyValuePair<string, JsonNode?>("userId", userId),
+                new KeyValuePair<string, JsonNode?>("name", name),
+                new KeyValuePair<string, JsonNode?>("profileImage", profileImage),
+                new KeyValuePair<string, JsonNode?>("badges", new JsonArray(badges)),
+                new KeyValuePair<string, JsonNode?>("isOwner", badges.Any(badge => badge["label"].GetValue<string>() == "OWNER")),
+                new KeyValuePair<string, JsonNode?>("isModerator", badges.Any(badge => badge["label"].GetValue<string>() == "MODERATOR")),
+                new KeyValuePair<string, JsonNode?>("isMember", badges.Any(badge => !string.IsNullOrEmpty(badge["url"].GetValue<string>())) || 
+                                                                rendererType is RendererType.LiveChatMembershipItemRenderer or 
+                                                                    RendererType.LiveChatSponsorshipsGiftPurchaseAnnouncementRenderer or 
+                                                                    RendererType.LiveChatSponsorshipsGiftRedemptionAnnouncementRenderer),
+                new KeyValuePair<string, JsonNode?>("autoModerated", badges.Any(badge => badge["label"].GetValue<string>() == "VERIFIED")),
+                new KeyValuePair<string, JsonNode?>("hasGift", 
+                    rendererType is RendererType.LiveChatPaidMessageRenderer or 
+                        RendererType.LiveChatPaidStickerRenderer or 
+                        RendererType.LiveChatMembershipItemRenderer or 
+                        RendererType.LiveChatSponsorshipsGiftRedemptionAnnouncementRenderer),
+                new KeyValuePair<string, JsonNode?>("comment", comment),
+                new KeyValuePair<string, JsonNode?>("timestamp",
+                    double.Parse(renderer["timestampUsec"].GetValue<string>()) / 1000.0),
+                new KeyValuePair<string, JsonNode?>("displayName", name),
+                new KeyValuePair<string, JsonNode?>("originalProfileImage", profileImage),
+                new KeyValuePair<string, JsonNode?>("isFirstTime", isFirstTime)
+            })),
+            new KeyValuePair<string, JsonNode?>("meta", new JsonObject(new[]
+            {
+                new KeyValuePair<string, JsonNode?>("interval", 0)
+            }))
         });
+
+        if (!string.IsNullOrEmpty(paidText))
+        {
+            var paidTextRegex = new Regex(PAID_TEXT_REGEX_PATTERN);
+            var paidTextMatches = paidTextRegex.Matches(paidText);
+
+            var colorKeys = new Dictionary<string, string[]>
+            {
+                {"headerBackgroundColor", new [] {"headerBackgroundColor", "moneyChipBackgroundColor"}},
+                {"headerTextColor", new [] {"headerTextColor", "moneyChipTextColor"}},
+                {"bodyBackgroundColor", new [] {"bodyBackgroundColor", "backgroundColor"}},
+                {"bodyTextColor", new [] {"bodyTextColor", "moneyChipTextColor"}},
+                {"authorNameTextColor", new [] {"authorNameTextColor"}},
+                {"timestampColor", new [] {"timestampColor"}}
+            };
+            
+            result["data"].AsObject().Add("paidText", paidText);
+            result["data"].AsObject().Add("unit", 
+                paidTextMatches.Count > 0 ? paidTextMatches[0].Groups[0].Value : string.Empty);
+            result["data"].AsObject().Add("price", 
+                paidTextMatches.Count > 0 ? paidTextMatches[0].Groups[1].Value : string.Empty);
+            result["data"].AsObject().Add("colors", new JsonObject(colorKeys
+                .Where(keyGroup => keyGroup.Value.Any(key => renderer[key] != null))
+                .Select(keyGroup => (Key: keyGroup.Key, Value: keyGroup.Value.First(key => renderer[key] != null)))
+                .Select(keyGroup =>
+                    new KeyValuePair<string, JsonNode?>(keyGroup.Key,
+                        _ToCssColorString(Color.FromArgb(unchecked((int) renderer[keyGroup.Value].GetValue<uint>())))))));
+        }
+
+        if (rendererType is RendererType.LiveChatMembershipItemRenderer or 
+            RendererType.LiveChatSponsorshipsGiftPurchaseAnnouncementRenderer or 
+            RendererType.LiveChatSponsorshipsGiftRedemptionAnnouncementRenderer)
+        {
+            result["data"].AsObject().Add("paidText", string.Empty);
+            result["data"].AsObject().Add("unit", string.Empty);
+            result["data"].AsObject().Add("price", "0");
+            result["data"].AsObject().Add("colors", new JsonObject(new[]
+            {
+                new KeyValuePair<string, JsonNode?>("headerBackgroundColor", "rgba(11,128,67,1)"),
+                new KeyValuePair<string, JsonNode?>("headerTextColor", "rgba(255,255,255,1)"),
+                new KeyValuePair<string, JsonNode?>("bodyBackgroundColor", "rgba(15,157,88,1)"),
+                new KeyValuePair<string, JsonNode?>("bodyTextColor", "rgba(255,255,255,1)"),
+                new KeyValuePair<string, JsonNode?>("authorNameTextColor", "rgba(255,255,255,1)"),
+                new KeyValuePair<string, JsonNode?>("timestampColor", "rgba(255,255,255,1)"),
+                
+            }));
+        }
+        
+        return result;
+    }
 
     private string _ToCssColorString(Color color)
         => $"rgba({color.R},{color.G},{color.B},{color.A / 255f})";
